@@ -4,3 +4,6 @@
 [submodule "third_party/lua_sol_cmake"]
 	path = third_party/lua_sol_cmake
 	url = https://github.com/dantros/lua_sol_cmake.git
+[submodule "third_party/argparse"]
+	path = third_party/argparse
+	url = https://github.com/p-ranav/argparse.git
