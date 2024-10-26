@@ -37,7 +37,10 @@ install(TARGETS nothofagus_lua_demo
 )
 
 # Installing files that will be needed at runtime.
-install(FILES "source/test.lua" DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(FILES
+    "source/test.lua"
+    "source/bellotas.lua"
+    DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # When executing the exe from visual studio, we need the install directory as the working directory,
 # this is to find external files. We need to run the install target before hand so those files are

@@ -9,6 +9,30 @@
 #include <sol/sol.hpp>
 #include <argparse/argparse.hpp>
 
+/* Convenience struct to represent a bellota in the scripting world */
+struct BellotaScript
+{
+    // transform
+    float x = 0.0f, y = 0.0f, scaleX = 1.0f, scaleY = 1.0f, scale = 1.0f, angle = 0.0f;
+
+    // texture
+    std::string texture = "";
+
+    int depthOffset = 0;
+    bool visible = true;
+};
+
+Nothofagus::Bellota convert(const BellotaScript& bellotaScript)
+{
+    Nothofagus::Transform transform
+    {
+        {bellotaScript.x, bellotaScript.y},
+        {bellotaScript.scale * bellotaScript.scaleX, bellotaScript.scale * bellotaScript.scaleY},
+        bellotaScript.angle
+    };
+    return {transform, {0}};
+}
+
 int main(int argc, char *argv[])
 {
     // You can directly use spdlog to ease your logging
@@ -32,37 +56,40 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    std::ifstream inputStream(inputFilename);
-    std::stringstream inputBuffer;
-    inputBuffer << inputStream.rdbuf();
-    const std::string script = inputBuffer.str();
-
     sol::state lua;
-    lua.open_libraries(sol::lib::base);
+    lua.open_libraries(sol::lib::base, sol::lib::io, sol::lib::math, sol::lib::table);
 
-    lua.script(script);
+    lua.new_usertype<BellotaScript>("Bellota",
+        sol::constructors<BellotaScript()>(),
+        "x", sol::property(&BellotaScript::x),
+        "y", sol::property(&BellotaScript::y),
+        "scaleX", sol::property(&BellotaScript::scaleX),
+        "scaleY", sol::property(&BellotaScript::scaleY),
+        "scale", sol::property(&BellotaScript::scale),
+        "angle", sol::property(&BellotaScript::angle),
+        "texture", sol::property(&BellotaScript::texture),
+        "depthOffset", sol::property(&BellotaScript::depthOffset),
+        "visible", sol::property(&BellotaScript::visible)
+    );
 
-    int x = 0;
-    lua.set_function("beep", [&x] { ++x; });
-    lua.script("beep()");
-    assert(x == 1);
+    try
+	{
+		lua.safe_script_file(inputFilename);
+		spdlog::info("Lua script loaded successfully");
+	}
+	catch (const sol::error& e)
+	{
+		spdlog::error("Error while processing the lua file: ", e.what());
+		return 0;
+	}
 
-    // Something slightly more interesting
-    lua.open_libraries(sol::lib::base);
+    BellotaScript bellota1 = lua["bellota1"].get<BellotaScript>();
 
-    const std::string my_script = R"(
-        local a,b,c = ...
-        print(a,b,c)
-    )";
+    ///////
+    
+    Nothofagus::Bellota bellotaX = convert(bellota1);
 
-    sol::load_result fx = lua.load(my_script);
-    if (!fx.valid()) {
-        sol::error err = fx;
-        std::cerr << "failed to load string-based script into the program" << err.what() << std::endl;
-    }
-
-    // prints "your arguments here"
-    fx("your", "arguments", "here");
+    ///////
 
     Nothofagus::ScreenSize screenSize{150, 100};
     Nothofagus::Canvas canvas(screenSize, "Demo App", {0.7, 0.7, 0.7}, 6);
@@ -89,7 +116,8 @@ int main(int argc, char *argv[])
         }
     );
     Nothofagus::TextureId textureId = canvas.addTexture(texture);
-    Nothofagus::BellotaId bellotaId = canvas.addBellota({{{75.0f, 75.0f}}, textureId});
+
+    Nothofagus::BellotaId bellotaId = canvas.addBellota(bellotaX);
 
     float time = 0.0f;
     constexpr float angularSpeed = 0.1;
