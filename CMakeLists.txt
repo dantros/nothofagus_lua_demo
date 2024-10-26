@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.30)
 
+include(GNUInstallDirs)
+
 project(nothofagus_lua_demo_sln CXX)
 
 option(NOTHOFAGUS_INSTALL "Disabling Nothofagus' installation" OFF)
@@ -11,7 +13,7 @@ file(GLOB_RECURSE HEADERS "source/*.h")
 
 add_executable(nothofagus_lua_demo
     "source/nothofagus_lua_demo.cpp"
-    
+
     # Only to show headers in VS
     ${HEADERS}
 )
@@ -40,11 +42,5 @@ install(TARGETS nothofagus_lua_demo
 install(FILES
     "source/test.lua"
     "source/bellotas.lua"
-    DESTINATION ${CMAKE_INSTALL_BINDIR})
-
-# When executing the exe from visual studio, we need the install directory as the working directory,
-# this is to find external files. We need to run the install target before hand so those files are
-# placed there.
-set_target_properties( nothofagus_lua_demo
-    PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}/bin
+    DESTINATION ${CMAKE_INSTALL_BINDIR}
 )

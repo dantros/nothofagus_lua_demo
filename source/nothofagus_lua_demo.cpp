@@ -9,33 +9,96 @@
 #include <sol/sol.hpp>
 #include <argparse/argparse.hpp>
 
-/* Convenience struct to represent a bellota in the scripting world */
-struct BellotaScript
+/* Convenience struct to represent a Texture in the scripting world */
+struct TextureScript
 {
-    // transform
-    float x = 0.0f, y = 0.0f, scaleX = 1.0f, scaleY = 1.0f, scale = 1.0f, angle = 0.0f;
+    std::size_t width = 1, height = 1;
+    std::vector<std::uint8_t> pixels = { 0 };
+    std::vector<float> palette = { 1.0f, 1.0f, 1.0f, 1.0f };
 
-    // texture
-    std::string texture = "";
+    static void addUserType(sol::state& lua)
+    {
+        lua.new_usertype<TextureScript>("Texture",
+            sol::constructors<TextureScript()>(),
+            "width", sol::property(&TextureScript::width),
+            "height", sol::property(&TextureScript::height),
+            "pixels", sol::property(&TextureScript::pixels),
+            "palette", sol::property(&TextureScript::palette)
+        );
+    }
 
-    int depthOffset = 0;
-    bool visible = true;
+    Nothofagus::Texture toCpp() const
+    {
+        Nothofagus::Texture out({ width, height }, { 1.0f, 1.0f, 1.0f, 1.0f });
+
+        if (palette.size() % 4 != 0)
+            throw;
+
+        Nothofagus::ColorPallete colorPalette(1, { 1.0f, 1.0f, 1.0f, 1.0f });
+
+        std:size_t numberOfColors = palette.size() / 4;
+        colorPalette.colors.resize(numberOfColors);
+
+        for (std::size_t i = 0; i < palette.size(); i += 4)
+        {
+            glm::vec4 color(
+                palette[i],
+                palette[i + 1],
+                palette[i + 2],
+                palette[i + 3]
+            );
+            colorPalette.colors.at(i / 4) = color;
+        }
+        out.setPallete(colorPalette);
+
+        out.setPixels(pixels.begin(), pixels.end());
+
+        return out;
+    }
 };
 
-Nothofagus::Bellota convert(const BellotaScript& bellotaScript)
+/* Convenience struct to represent a Bellota in the scripting world */
+struct BellotaScript
 {
-    Nothofagus::Transform transform
+    float x = 0.0f, y = 0.0f, scaleX = 1.0f, scaleY = 1.0f, scale = 1.0f, angle = 0.0f;
+    unsigned int texture = 0;
+    int depthOffset = 0;
+    bool visible = true;
+
+    static void addUserType(sol::state& lua)
     {
-        {bellotaScript.x, bellotaScript.y},
-        {bellotaScript.scale * bellotaScript.scaleX, bellotaScript.scale * bellotaScript.scaleY},
-        bellotaScript.angle
-    };
-    return {transform, {0}};
-}
+        lua.new_usertype<BellotaScript>("Bellota",
+            sol::constructors<BellotaScript()>(),
+            "x", sol::property(&BellotaScript::x),
+            "y", sol::property(&BellotaScript::y),
+            "scaleX", sol::property(&BellotaScript::scaleX),
+            "scaleY", sol::property(&BellotaScript::scaleY),
+            "scale", sol::property(&BellotaScript::scale),
+            "angle", sol::property(&BellotaScript::angle),
+            "texture", sol::property(&BellotaScript::texture),
+            "depthOffset", sol::property(&BellotaScript::depthOffset),
+            "visible", sol::property(&BellotaScript::visible)
+        );
+    }
+
+    Nothofagus::Bellota toCpp() const
+    {
+        Nothofagus::Transform transform
+        {
+            {x, y},
+            {scale * scaleX, scale * scaleY},
+            angle
+        };
+
+        Nothofagus::Bellota bellota(transform, { texture }, depthOffset);
+        bellota.visible() = visible;
+
+        return bellota;
+    }
+};
 
 int main(int argc, char *argv[])
 {
-    // You can directly use spdlog to ease your logging
     spdlog::info("Welcome to Nothofagus Lua Demo App!");
 
     argparse::ArgumentParser program("loading_lua_file");
@@ -51,26 +114,15 @@ int main(int argc, char *argv[])
         program.parse_args(argc, argv);
     }
     catch (const std::exception& err) {
-        std::cerr << err.what() << std::endl;
+        spdlog::error("Invalid arguments: ", err.what());
         std::cerr << program;
         return 1;
     }
 
     sol::state lua;
     lua.open_libraries(sol::lib::base, sol::lib::io, sol::lib::math, sol::lib::table);
-
-    lua.new_usertype<BellotaScript>("Bellota",
-        sol::constructors<BellotaScript()>(),
-        "x", sol::property(&BellotaScript::x),
-        "y", sol::property(&BellotaScript::y),
-        "scaleX", sol::property(&BellotaScript::scaleX),
-        "scaleY", sol::property(&BellotaScript::scaleY),
-        "scale", sol::property(&BellotaScript::scale),
-        "angle", sol::property(&BellotaScript::angle),
-        "texture", sol::property(&BellotaScript::texture),
-        "depthOffset", sol::property(&BellotaScript::depthOffset),
-        "visible", sol::property(&BellotaScript::visible)
-    );
+    TextureScript::addUserType(lua);
+    BellotaScript::addUserType(lua);
 
     try
 	{
@@ -83,41 +135,31 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 
-    BellotaScript bellota1 = lua["bellota1"].get<BellotaScript>();
-
-    ///////
-    
-    Nothofagus::Bellota bellotaX = convert(bellota1);
-
-    ///////
+    auto bellotas = lua["bellotas"].get<std::vector<BellotaScript>>();
+    auto textures = lua["textures"].get<std::vector<TextureScript>>();
 
     Nothofagus::ScreenSize screenSize{150, 100};
-    Nothofagus::Canvas canvas(screenSize, "Demo App", {0.7, 0.7, 0.7}, 6);
+    Nothofagus::Canvas canvas(screenSize, "Nothofagus Lua Demo", {0.7, 0.7, 0.7}, 6);
 
-    Nothofagus::ColorPallete pallete{
-        {0.0, 0.0, 0.0, 0.0},
-        {0.0, 0.4, 0.0, 1.0},
-        {0.2, 0.8, 0.2, 1.0},
-        {0.5, 1.0, 0.5, 1.0},
-    };
-    
-    Nothofagus::Texture texture({8, 8}, {0.5, 0.5, 0.5, 1.0});
-    texture.setPallete(pallete)
-        .setPixels(
-        {
-            2,1,3,0,0,3,2,1,
-            2,1,1,0,0,0,2,1,
-            2,1,1,1,0,0,2,1,
-            2,1,2,1,1,0,2,1,
-            2,1,0,2,1,1,2,1,
-            2,1,0,0,2,1,2,1,
-            2,1,0,0,0,2,2,1,
-            2,1,3,0,0,3,2,1,
-        }
-    );
-    Nothofagus::TextureId textureId = canvas.addTexture(texture);
+    std::vector<Nothofagus::BellotaId> bellotaIds;
+    bellotaIds.reserve(bellotas.size());
 
-    Nothofagus::BellotaId bellotaId = canvas.addBellota(bellotaX);
+    for (auto& bellotaScript : bellotas)
+    {
+        Nothofagus::Bellota bellota = bellotaScript.toCpp();
+        Nothofagus::BellotaId bellotaId = canvas.addBellota(bellota);
+        bellotaIds.push_back(bellotaId);
+    }
+
+    std::vector<Nothofagus::TextureId> textureIds;
+    textureIds.reserve(textures.size());
+
+    for (auto& textureScript : textures)
+    {
+        Nothofagus::Texture texture = textureScript.toCpp();
+        Nothofagus::TextureId textureId = canvas.addTexture(texture);
+        textureIds.push_back(textureId);
+    }
 
     float time = 0.0f;
     constexpr float angularSpeed = 0.1;
@@ -131,9 +173,7 @@ int main(int argc, char *argv[])
     {
         time += dt;
 
-        Nothofagus::Bellota& bellota = canvas.bellota(bellotaId);
-        float scale = 2.0f + 0.5f * std::sin(0.005f * time);
-        bellota.transform().scale() = glm::vec2(scale, scale);
+        Nothofagus::Bellota& bellota = canvas.bellota(bellotaIds[0]);
 
         ImGui::Begin("Hello there!");
         ImGui::Text("Discrete control keys: W, S, ESCAPE");
@@ -155,11 +195,11 @@ int main(int argc, char *argv[])
     Nothofagus::Controller controller;
     controller.registerAction({Nothofagus::Key::W, Nothofagus::DiscreteTrigger::Press}, [&]()
     {
-        canvas.bellota(bellotaId).transform().location().y += 10.0f;
+        canvas.bellota(bellotaIds[0]).transform().location().y += 10.0f;
     });
     controller.registerAction({Nothofagus::Key::S, Nothofagus::DiscreteTrigger::Press}, [&]()
     {
-        canvas.bellota(bellotaId).transform().location().y -= 10.0f;
+        canvas.bellota(bellotaIds[0]).transform().location().y -= 10.0f;
     });
     controller.registerAction({Nothofagus::Key::A, Nothofagus::DiscreteTrigger::Press}, [&]()
     {
