@@ -5,6 +5,7 @@
 #include <cmath>
 #include <algorithm>
 #include <nothofagus.h>
+#include <sol/sol.hpp>
 
 int main()
 {

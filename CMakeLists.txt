@@ -18,7 +18,7 @@ add_executable(nothofagus_lua_demo
 set_property(TARGET nothofagus_lua_demo PROPERTY CXX_STANDARD 20)
 target_include_directories(nothofagus_lua_demo PRIVATE
     ${NOTHOFAGUS_INCLUDE}
-    "third_party/sol2"
+    ${LUA_SOL_INCLUDE}
 )
 target_link_libraries(nothofagus_lua_demo PRIVATE
     nothofagus
