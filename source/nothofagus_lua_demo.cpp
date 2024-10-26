@@ -4,15 +4,44 @@
 #include <ciso646>
 #include <cmath>
 #include <algorithm>
+#include <fstream>
 #include <nothofagus.h>
 #include <sol/sol.hpp>
+#include <argparse/argparse.hpp>
 
-int main()
+int main(int argc, char *argv[])
 {
     // You can directly use spdlog to ease your logging
     spdlog::info("Welcome to Nothofagus Lua Demo App!");
 
+    argparse::ArgumentParser program("loading_lua_file");
+
+    std::string inputFilename;
+
+    program.add_argument("-i", "--input")
+        .help("file name of the lua file to process")
+        .required()
+        .store_into(inputFilename);
+
+    try {
+        program.parse_args(argc, argv);
+    }
+    catch (const std::exception& err) {
+        std::cerr << err.what() << std::endl;
+        std::cerr << program;
+        return 1;
+    }
+
+    std::ifstream inputStream(inputFilename);
+    std::stringstream inputBuffer;
+    inputBuffer << inputStream.rdbuf();
+    const std::string script = inputBuffer.str();
+
     sol::state lua;
+    lua.open_libraries(sol::lib::base);
+
+    lua.script(script);
+
     int x = 0;
     lua.set_function("beep", [&x] { ++x; });
     lua.script("beep()");

@@ -19,6 +19,7 @@ set_property(TARGET nothofagus_lua_demo PROPERTY CXX_STANDARD 20)
 target_include_directories(nothofagus_lua_demo PRIVATE
     ${NOTHOFAGUS_INCLUDE}
     ${LUA_SOL_INCLUDE}
+    "third_party/argparse/include"
 )
 target_link_libraries(nothofagus_lua_demo PRIVATE
     nothofagus
@@ -33,4 +34,14 @@ install(TARGETS nothofagus_lua_demo
         NAMELINK_COMPONENT Demo_Development
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         COMPONENT Demo_Development
+)
+
+# Installing files that will be needed at runtime.
+install(FILES "source/test.lua" DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+# When executing the exe from visual studio, we need the install directory as the working directory,
+# this is to find external files. We need to run the install target before hand so those files are
+# placed there.
+set_target_properties( nothofagus_lua_demo
+    PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY ${CMAKE_INSTALL_PREFIX}/bin
 )
