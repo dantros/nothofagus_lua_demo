@@ -1,6 +1,6 @@
-# Nothofagus Demo Project
+# Nothofagus Lua Demo Project
 
-This is a sample project using the [Nothofagus](https://github.com/dantros/nothofagus) renderer, it is only meant as a template for you to start working from.
+This is a sample project using the [Nothofagus](https://github.com/dantros/nothofagus) renderer and Lua scripting vía Sol, it is only meant as a template for you to start working from.
 
 You can use this repository as a GitHub template by clicking 'Use this template' at the upper right corner of the GitHub website. You will get a new repository starting from this code.
 
