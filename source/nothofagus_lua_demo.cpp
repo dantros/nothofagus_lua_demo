@@ -9,7 +9,7 @@
 int main()
 {
     // You can directly use spdlog to ease your logging
-    spdlog::info("Welcome to Nothofagus Demo App!");
+    spdlog::info("Welcome to Nothofagus Lua Demo App!");
 
     Nothofagus::ScreenSize screenSize{150, 100};
     Nothofagus::Canvas canvas(screenSize, "Demo App", {0.7, 0.7, 0.7}, 6);
