@@ -1,3 +1,6 @@
 [submodule "third_party/nothofagus"]
 	path = third_party/nothofagus
 	url = git@github.com:dantros/nothofagus.git
+[submodule "third_party/lua_sol_cmake"]
+	path = third_party/lua_sol_cmake
+	url = https://github.com/dantros/lua_sol_cmake.git
