@@ -69,15 +69,15 @@ struct BellotaScript
     {
         lua.new_usertype<BellotaScript>("Bellota",
             sol::constructors<BellotaScript()>(),
-            "x", sol::property(&BellotaScript::x),
-            "y", sol::property(&BellotaScript::y),
-            "scaleX", sol::property(&BellotaScript::scaleX),
-            "scaleY", sol::property(&BellotaScript::scaleY),
-            "scale", sol::property(&BellotaScript::scale),
-            "angle", sol::property(&BellotaScript::angle),
-            "texture", sol::property(&BellotaScript::texture),
-            "depthOffset", sol::property(&BellotaScript::depthOffset),
-            "visible", sol::property(&BellotaScript::visible)
+            "x", sol::property(&BellotaScript::x, &BellotaScript::x),
+            "y", sol::property(&BellotaScript::y, &BellotaScript::y),
+            "scaleX", sol::property(&BellotaScript::scaleX, &BellotaScript::scaleX),
+            "scaleY", sol::property(&BellotaScript::scaleY, &BellotaScript::scaleY),
+            "scale", sol::property(&BellotaScript::scale, &BellotaScript::scale),
+            "angle", sol::property(&BellotaScript::angle, &BellotaScript::angle),
+            "texture", sol::property(&BellotaScript::texture, &BellotaScript::texture),
+            "depthOffset", sol::property(&BellotaScript::depthOffset, &BellotaScript::depthOffset),
+            "visible", sol::property(&BellotaScript::visible, &BellotaScript::visible)
         );
     }
 
@@ -95,20 +95,64 @@ struct BellotaScript
 
         return bellota;
     }
+
+    static BellotaScript fromCpp(const Nothofagus::Bellota& bellota)
+    {
+        BellotaScript bellotaScript;
+        bellotaScript.x = bellota.transform().location().x;
+        bellotaScript.y = bellota.transform().location().y;
+        bellotaScript.scaleX = bellota.transform().scale().x;
+        bellotaScript.scaleY = bellota.transform().scale().y;
+        bellotaScript.angle = bellota.transform().angle();
+        bellotaScript.texture = bellota.texture().id;
+        bellotaScript.depthOffset = bellota.depthOffset();
+        bellotaScript.visible = bellota.visible();
+
+        return bellotaScript;
+    }
+
+    void modify(const Nothofagus::Bellota& bellota)
+    {
+        x = bellota.transform().location().x;
+        y = bellota.transform().location().y;
+        scaleX = bellota.transform().scale().x;
+        scaleY = bellota.transform().scale().y;
+        angle = bellota.transform().angle();
+        //texture = bellota.texture().id; // texture cannot be updated during runtime
+        depthOffset = bellota.depthOffset();
+        visible = bellota.visible();
+    }
+
+    static void modify(const BellotaScript& bellotaScript, Nothofagus::Bellota& bellota)
+    {
+        bellota.transform().location().x = bellotaScript.x;
+        bellota.transform().location().y = bellotaScript.y;
+        bellota.transform().scale().x = bellotaScript.scaleX * bellotaScript.scale;
+        bellota.transform().scale().y = bellotaScript.scaleY * bellotaScript.scale;
+        bellota.transform().angle() = bellotaScript.angle;
+        //bellota.texture().id = bellotaScript.texture // texture cannot be updated during runtime
+        bellota.depthOffset() = bellotaScript.depthOffset;
+        bellota.visible() = bellotaScript.visible;
+    }
 };
 
 int main(int argc, char *argv[])
 {
-    spdlog::info("Welcome to Nothofagus Lua Demo App!");
+    const std::string appName = "Nothofagus Lua Demo";
+    spdlog::info("Welcome to ", appName, "!");
 
     argparse::ArgumentParser program("loading_lua_file");
 
-    std::string inputFilename;
+    std::string initFilename = "";
+    std::string updateFilename = "";
 
-    program.add_argument("-i", "--input")
-        .help("file name of the lua file to process")
+    program.add_argument("-i", "--init")
+        .help("lua file to initialize our canvas")
         .required()
-        .store_into(inputFilename);
+        .store_into(initFilename);
+    program.add_argument("-u", "--update")
+        .help("lua file to update some bellotas")
+        .store_into(updateFilename);
 
     try {
         program.parse_args(argc, argv);
@@ -119,39 +163,34 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    Nothofagus::ScreenSize screenSize{ 150, 100 };
+    Nothofagus::Canvas canvas(screenSize, appName, { 0.7, 0.7, 0.7 }, 6);
+
+    std::vector<Nothofagus::TextureId> textureIds;
+    std::vector<Nothofagus::BellotaId> bellotaIds;
+    
     sol::state lua;
     lua.open_libraries(sol::lib::base, sol::lib::io, sol::lib::math, sol::lib::table);
     TextureScript::addUserType(lua);
     BellotaScript::addUserType(lua);
 
     try
-	{
-		lua.safe_script_file(inputFilename);
-		spdlog::info("Lua script loaded successfully");
-	}
-	catch (const sol::error& e)
-	{
-		spdlog::error("Error while processing the lua file: ", e.what());
-		return 0;
-	}
-
-    auto bellotas = lua["bellotas"].get<std::vector<BellotaScript>>();
-    auto textures = lua["textures"].get<std::vector<TextureScript>>();
-
-    Nothofagus::ScreenSize screenSize{150, 100};
-    Nothofagus::Canvas canvas(screenSize, "Nothofagus Lua Demo", {0.7, 0.7, 0.7}, 6);
-
-    std::vector<Nothofagus::BellotaId> bellotaIds;
-    bellotaIds.reserve(bellotas.size());
-
-    for (auto& bellotaScript : bellotas)
     {
-        Nothofagus::Bellota bellota = bellotaScript.toCpp();
-        Nothofagus::BellotaId bellotaId = canvas.addBellota(bellota);
-        bellotaIds.push_back(bellotaId);
+        lua.safe_script_file(initFilename);
+        spdlog::info("Initialization lua script loaded successfully");
+    }
+    catch (const sol::error& e)
+    {
+        spdlog::error("Error while processing the lua file: ", e.what());
+        return 0;
     }
 
-    std::vector<Nothofagus::TextureId> textureIds;
+    std::vector<BellotaScript> bellotas = lua["bellotas"].get<std::vector<BellotaScript>>();
+    std::vector<TextureScript> textures = lua["textures"].get<std::vector<TextureScript>>();
+
+    lua["bellotas"] = &bellotas;
+    lua["textures"] = &textures;
+
     textureIds.reserve(textures.size());
 
     for (auto& textureScript : textures)
@@ -161,45 +200,75 @@ int main(int argc, char *argv[])
         textureIds.push_back(textureId);
     }
 
-    float time = 0.0f;
-    constexpr float angularSpeed = 0.1;
-    constexpr float growingSpeed = 0.1;
+    bellotaIds.reserve(bellotas.size());
+
+    for (auto& bellotaScript : bellotas)
+    {
+        Nothofagus::Bellota bellota = bellotaScript.toCpp();
+        Nothofagus::BellotaId bellotaId = canvas.addBellota(bellota);
+        bellotaIds.push_back(bellotaId);
+    }
+
+    std::function<void(float)> scriptUpdate = [](float dt){};
+
+    if (updateFilename != "")
+    {
+        try
+        {
+            lua.safe_script_file(updateFilename);
+        }
+        catch (const sol::error& e)
+        {
+            spdlog::error("Error while processing the lua file: ", e.what());
+            return 0;
+        }
+    }
+    else
+    {
+        spdlog::info("No update lua script has been provided.");
+    }
+
     constexpr float horizontalSpeed = 0.1;
-    bool rotate = true;
     bool leftKeyPressed = false;
     bool rightKeyPressed = false;
 
     auto update = [&](float dt)
     {
-        time += dt;
-
-        Nothofagus::Bellota& bellota = canvas.bellota(bellotaIds[0]);
+        BellotaScript& playerBellotaScript = bellotas.at(bellotaIds[0].id);
 
         ImGui::Begin("Hello there!");
         ImGui::Text("Discrete control keys: W, S, ESCAPE");
         ImGui::Text("Continuous control keys: A, D");
         ImGui::End();
 
-        if (rotate)
-            bellota.transform().angle() += angularSpeed * dt;
-
         if (leftKeyPressed)
-            bellota.transform().location().x -= horizontalSpeed * dt;
+            playerBellotaScript.x -= horizontalSpeed * dt;
 
         if (rightKeyPressed)
-            bellota.transform().location().x += horizontalSpeed * dt;
+            playerBellotaScript.x += horizontalSpeed * dt;
 
-        bellota.transform().location().x = std::clamp<float>(bellota.transform().location().x, 10, screenSize.width-10);
+        playerBellotaScript.x = std::clamp<float>(playerBellotaScript.x, 10, screenSize.width-10);
+
+        sol::function luaUpdate = lua["update"];
+        luaUpdate(dt);
+
+        // updating all bellotas from script world to native world
+        for (std::size_t i = 0 ; i < bellotas.size() ; ++i)
+        {
+            BellotaScript& bellotaScript = bellotas.at(i);
+            Nothofagus::Bellota& bellota = canvas.bellota({ i });
+            BellotaScript::modify(bellotaScript, bellota);
+        }
     };
 
     Nothofagus::Controller controller;
     controller.registerAction({Nothofagus::Key::W, Nothofagus::DiscreteTrigger::Press}, [&]()
     {
-        canvas.bellota(bellotaIds[0]).transform().location().y += 10.0f;
+        bellotas.at(0).y += 10.0f;
     });
     controller.registerAction({Nothofagus::Key::S, Nothofagus::DiscreteTrigger::Press}, [&]()
     {
-        canvas.bellota(bellotaIds[0]).transform().location().y -= 10.0f;
+            bellotas.at(0).y -= 10.0f;
     });
     controller.registerAction({Nothofagus::Key::A, Nothofagus::DiscreteTrigger::Press}, [&]()
     {
@@ -216,10 +285,6 @@ int main(int argc, char *argv[])
     controller.registerAction({Nothofagus::Key::D, Nothofagus::DiscreteTrigger::Release}, [&]()
     {
         rightKeyPressed = false;
-    });
-    controller.registerAction({Nothofagus::Key::SPACE, Nothofagus::DiscreteTrigger::Press}, [&]()
-    {
-        rotate = not rotate;
     });
     controller.registerAction({Nothofagus::Key::ESCAPE, Nothofagus::DiscreteTrigger::Press}, [&]() { canvas.close(); });
     

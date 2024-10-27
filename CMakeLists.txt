@@ -41,6 +41,7 @@ install(TARGETS nothofagus_lua_demo
 # Installing files that will be needed at runtime.
 install(FILES
     "source/test.lua"
-    "source/bellotas.lua"
+    "source/init.lua"
+    "source/update.lua"
     DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
