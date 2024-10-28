@@ -86,7 +86,7 @@ textures = {textureColors, textureGreenN, textureRedN}
 bellotaColors = Bellota.new()
 bellotaColors.x = 75.0
 bellotaColors.y = 50.0
-bellotaColors.scale = 2.0
+bellotaColors.scale = 5.0
 bellotaColors.texture = 0
 bellotaColors.depthOffset = 0
 
